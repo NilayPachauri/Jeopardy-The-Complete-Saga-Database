@@ -8,9 +8,6 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 
-# define the order our columns are displayed in the datastore
-# scraperwiki.sqlite.save_var('data_columns', ['air_date','episode', 'category', 'dollar_value', 'text', 'answer','uid'])
-
 seasons_url = 'http://www.j-archive.com/listseasons.php'
 base_url = 'http://www.j-archive.com/'
 
@@ -39,7 +36,7 @@ def scrape_season(url, season):
     episodes = soup.find('div', {"id":"content"}).findAll('a',{"href":re.compile('showgame\.php')})
     for episode in episodes:
         ep_data = unicodedata.normalize('NFKC', episode.text).split(',')
-        ep_num = re.search('#(\d+)', ep_data[0]).group(1)
+        ep_num = int(re.search('#(\d+)', ep_data[0]).group(1))
 
         # Get the Date
         air_data = re.search('(\d{4}-\d{2}-\d{2})', ep_data[1]).group(1) + ' UTC'
@@ -51,6 +48,9 @@ def scrape_season(url, season):
 
 
 def scrape_episode(url, season, episode, air_date):
+    # Warm Start Due to Google Firebase Quota Limits
+    if episode > 8109:
+        return
     
     try:
         soup = BeautifulSoup(scraperwiki.scrape(url), features='lxml')
@@ -80,6 +80,10 @@ def scrape_episode(url, season, episode, air_date):
         
                     #a shitty unique id but it should do
                     uid = ': '.join([str(episode), clue_attribs['category'], str(clue_attribs['dollar_value'])])
+
+                    # Replace potential forward slashes with backward slashes
+                    # Note: Firebase forward slash represeents a new collection
+                    uid = uid.replace('/', '\\')
 
                     doc_ref = db.collection(u'clues').document(uid)
                     doc_ref.set(clue_attribs)
@@ -130,7 +134,5 @@ def get_clue_attribs(clue, cats, fj_div=None):
         }
 
         return clue_dict
-
-
 
 scrape_all_seasons(seasons_url)

@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # Private Key
-firebase_key.json
+firestore_key.json
 aws_key.csv
 
 # pickle

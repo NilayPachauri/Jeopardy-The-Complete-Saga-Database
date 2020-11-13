@@ -61,8 +61,7 @@ def scrape_all_seasons(url):
     soup = BeautifulSoup(scraperwiki.scrape(url), features='lxml')
 
     # list of already scraped seasons
-    # scraped_seasons = ['Season 37', 'Jeopardy!: The Greatest of All Time', 'Season 36']
-    scraped_seasons= []
+    scraped_seasons = ['Season 37', 'Jeopardy!: The Greatest of All Time', 'Season 36', 'Season 35', 'Season 34', 'Season 33']
 
     #Grab all of the seasons listed
     seasons = soup.find('div', {"id":"content"}).findAll('a')
@@ -79,8 +78,6 @@ def scrape_all_seasons(url):
         print('Finished scraping ' + season_name)
         print()
 
-
-
 def scrape_season(url, season):
     
     soup = BeautifulSoup(scraperwiki.scrape(url), features='lxml')
@@ -88,21 +85,25 @@ def scrape_season(url, season):
     #Grab the div that contains the content and search for any links
     episodes = soup.find('div', {"id":"content"}).findAll('a',{"href":re.compile('showgame\.php')})
     for episode in episodes:
-        ep_data = unicodedata.normalize('NFKC', episode.text).split(',')
-        ep_num = int(re.search('#(\d+)', ep_data[0]).group(1))
+        try:
+            ep_data = unicodedata.normalize('NFKC', episode.text).split(',')
+            ep_num = int(re.search('#(\d+)', ep_data[0]).group(1))
 
-        # Get the Date
-        air_data = re.search('(\d{4}-\d{2}-\d{2})', ep_data[1]).group(1) + ' UTC'
-        air_datetime = datetime.strptime(air_data, '%Y-%m-%d %Z')
-        air_date = air_datetime.strftime('%Y/%m/%d')
+            # Get the Date
+            air_data = re.search('(\d{4}-\d{2}-\d{2})', ep_data[1]).group(1) + ' UTC'
+            air_datetime = datetime.strptime(air_data, '%Y-%m-%d %Z')
+            air_date = air_datetime.strftime('%Y/%m/%d')
 
-        print('\tScraping Episode {} from {}'.format(ep_num, episode['href']))
-        scrape_episode(episode['href'], season, ep_num, air_date)
+            print('\tScraping Episode {} from {}'.format(ep_num, episode['href']))
+            scrape_episode(episode['href'], season, ep_num, air_date)
+        except Exception as e:
+            print('\tCould not correctly parse ' + unicodedata.normalize('NFKC', episode.text).strip())
+            pass
 
 
 def scrape_episode(url, season, episode, air_date):
-    # Warm Start Due to Google Firebase Quota Limits
-    # if episode > 7937:
+    # Warm Start Due to Errors
+    # if episode > 7345:
     #     return
     
     try:
@@ -152,7 +153,7 @@ def scrape_episode(url, season, episode, air_date):
 
                         clue_attribs['uid'] = uid
                         
-                        batch.put_item(Item=clue_attribs)
+                        # batch.put_item(Item=clue_attribs)
 
     except RuntimeError:
         exception = 1
@@ -176,16 +177,7 @@ def get_clue_attribs(clue, cats, fj_div=None):
         cat_order = 1 if j_type == 'FJ' else int(clue_props[3])
 
         #Now to figure out the category
-        # if j_type == "FJ":
-        #     cat = cats[12]
-        # elif j_type == "DJ":
-        #     cat = cats[cat_num+5]
-        # else:
-        #     cat = cats[cat_num-1]
         cat = cats[j_type][cat_num - 1]
-
-        #Are we in double jeopardy?
-        dj = clue_props[1] == "DJ"
 
         #The class name for the dollar value varies if it's a daily double
         dollar_value = "FJ: $0" if j_type == 'FJ' else clue.find(attrs={"class" : re.compile('clue_value*')}).text

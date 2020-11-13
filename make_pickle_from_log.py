@@ -1,8 +1,14 @@
+import argparse
 import pickle
 import re
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--log', help='the log file to make the pickle file from')
+parser.add_argument('--pickle', help='the name of the pickle file to write to')
+args = parser.parse_args()
+
 # Get all the lines from the log file
-lines = [line.strip() for line in open('./dynamodb.log').readlines()]
+lines = [line.strip() for line in open(args.log).readlines()]
 
 # Create the Regex to detect the season, episode
 season_regex = r'Scraping (.+) from showseason\.php'
@@ -29,7 +35,7 @@ for line in lines:
 		else:
 			processed_dict[season] = [episode]
 
-with open('dynamodb_processed.p', 'wb') as file:
+with open(args.pickle, 'wb') as file:
 	pickle.dump(processed_dict, file)
 
 print(processed_dict)

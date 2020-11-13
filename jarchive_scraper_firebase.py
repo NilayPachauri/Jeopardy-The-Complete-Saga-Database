@@ -19,14 +19,24 @@ db = firestore.client()
 def scrape_all_seasons(url):
 
     soup = BeautifulSoup(scraperwiki.scrape(url), features='lxml')
+
+    # list of already scraped seasons
+    scraped_seasons = ['Season 37', 'Jeopardy!: The Greatest of All Time', 'Season 36']
     
     #Grab all of the seasons listed
     seasons = soup.find('div', {"id":"content"}).findAll('a')
     count = 0
     for season in seasons:
         season_name = unicodedata.normalize('NFKC', season.text)
+
         print('Scraping ' + season_name + ' from ' + season['href'])
-        scrape_season(base_url+season['href'], season_name)
+
+        # Only Scrape the Season if it has not been scraped
+        if season_name not in scraped_seasons:
+            scrape_season(base_url+season['href'], season_name)
+
+        print('Finished scraping ' + season_name)
+        print()
 
 def scrape_season(url, season):
     
@@ -43,17 +53,21 @@ def scrape_season(url, season):
         air_datetime = datetime.strptime(air_data, '%Y-%m-%d %Z')
         air_date = air_datetime.strftime('%Y/%m/%d')
 
-        print('Scraping Episode {} from {}'.format(ep_num, episode['href']))
+        print('\tScraping Episode {} from {}'.format(ep_num, episode['href']))
         scrape_episode(episode['href'], season, ep_num, air_date)
 
 
 def scrape_episode(url, season, episode, air_date):
     # Warm Start Due to Google Firebase Quota Limits
-    if episode > 8109:
+    if episode > 7937:
         return
     
     try:
         soup = BeautifulSoup(scraperwiki.scrape(url), features='lxml')
+
+        jeopardy_round_exists = soup.find('div', {'id': 'jeopardy_round'}) != None
+        double_jeopardy_round_exists = soup.find('div', {'id': 'double_jeopardy_round'}) != None
+        final_jeopardy_round_exists = soup.find('div', {'id': 'final_jeopardy_round'}) != None
 
         #only scrape full episodes
         allCategories = soup.findAll('td', {"class" : "category_name"})
@@ -62,7 +76,18 @@ def scrape_episode(url, season, episode, air_date):
             cats = [] # List of categories without any html
             for cat in allCategories:
                 cats.append(cat.text)
-    
+
+            # Populate the Category Dictionary
+            categories = {}
+            if jeopardy_round_exists:
+                categories['J'] = cats[:6]
+
+            if double_jeopardy_round_exists:
+                categories['DJ'] = cats[6:12] if jeopardy_round_exists else cats[:6]
+
+            if final_jeopardy_round_exists:
+                categories['FJ'] = [(cats[12] if double_jeopardy_round_exists else cats[6]) if jeopardy_round_exists else cats[1]]
+            
             allClues = soup.findAll(attrs={"class" : "clue"})
             for clue in allClues:
 
@@ -72,7 +97,7 @@ def scrape_episode(url, season, episode, air_date):
                 if not clue.find('div') and clue.find(id='clue_FJ'):
                     fj_div = clue.parent.parent.find('div')
 
-                clue_attribs = get_clue_attribs(clue, cats, fj_div)
+                clue_attribs = get_clue_attribs(clue, categories, fj_div)
                 if clue_attribs:
                     clue_attribs['air_date'] = air_date
                     clue_attribs['season'] = season
@@ -110,12 +135,13 @@ def get_clue_attribs(clue, cats, fj_div=None):
         cat_order = 1 if j_type == 'FJ' else int(clue_props[3])
 
         #Now to figure out the category
-        if j_type == "FJ":
-            cat = cats[12]
-        elif j_type == "DJ":
-            cat = cats[cat_num+5]
-        else:
-            cat = cats[cat_num-1]
+        # if j_type == "FJ":
+        #     cat = cats[12]
+        # elif j_type == "DJ":
+        #     cat = cats[cat_num+5]
+        # else:
+        #     cat = cats[cat_num-1]
+        cat = cats[j_type][cat_num - 1]
 
         #Are we in double jeopardy?
         dj = clue_props[1] == "DJ"

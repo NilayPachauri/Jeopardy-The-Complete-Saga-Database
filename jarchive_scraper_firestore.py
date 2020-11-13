@@ -20,7 +20,8 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # Load the already processed episodes
-processed = pickle.load(open('./firestore_processed.p', 'rb'))
+pickle_file = './firestore_processed.p'
+processed = pickle.load(open(pickle_file, 'rb'))
 
 def scrape_all_seasons(url):
 
@@ -126,7 +127,7 @@ def scrape_episode(url, season, episode, air_date):
                 processed[season] = [episode]
 
             # Write out the pickle file
-            with open('./dynamodb_processed.p', 'wb') as file:
+            with open(pickle_file, 'wb') as file:
                 pickle.dump(processed, file)
 
     except RuntimeError:

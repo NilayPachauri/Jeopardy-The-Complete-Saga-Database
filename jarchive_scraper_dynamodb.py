@@ -1,7 +1,10 @@
 from bs4 import BeautifulSoup
 import scraperwiki
+
 from datetime import datetime
+import pickle
 import re
+import sys
 import unicodedata
 
 import boto3
@@ -56,12 +59,12 @@ except ClientError as e:
     table = dynamodb.Table(table_name)
     print('Loaded Table')
 
+# Load the already processed episodes
+processed = pickle.load(open('./dynamodb_processed.p', 'rb'))
+
 def scrape_all_seasons(url):
 
     soup = BeautifulSoup(scraperwiki.scrape(url), features='lxml')
-
-    # list of already scraped seasons
-    scraped_seasons = ['Season 37', 'Jeopardy!: The Greatest of All Time', 'Season 36', 'Season 35', 'Season 34', 'Season 33']
 
     #Grab all of the seasons listed
     seasons = soup.find('div', {"id":"content"}).findAll('a')
@@ -70,11 +73,7 @@ def scrape_all_seasons(url):
         season_name = unicodedata.normalize('NFKC', season.text)
 
         print('Scraping ' + season_name + ' from ' + season['href'])
-
-        # Only Scrape the Season if it has not been scraped
-        if season_name not in scraped_seasons:
-            scrape_season(base_url+season['href'], season_name)
-
+        scrape_season(base_url+season['href'], season_name)
         print('Finished scraping ' + season_name)
         print()
 
@@ -98,13 +97,13 @@ def scrape_season(url, season):
             scrape_episode(episode['href'], season, ep_num, air_date)
         except Exception as e:
             print('\tCould not correctly parse ' + unicodedata.normalize('NFKC', episode.text).strip())
-            pass
+        sys.stdout.flush()
 
 
 def scrape_episode(url, season, episode, air_date):
     # Warm Start Due to Errors
-    # if episode > 7345:
-    #     return
+    if season in processed and episode in processed[season]:
+        return
     
     try:
         soup = BeautifulSoup(scraperwiki.scrape(url), features='lxml')
@@ -132,8 +131,9 @@ def scrape_episode(url, season, episode, air_date):
             if final_jeopardy_round_exists:
                 categories['FJ'] = [(cats[12] if double_jeopardy_round_exists else cats[6]) if jeopardy_round_exists else cats[1]]
             
-            allClues = soup.findAll(attrs={"class" : "clue"})
+            # Perform a Batch Write for all Clues in an Episode
             with table.batch_writer() as batch:
+                allClues = soup.findAll(attrs={"class" : "clue"})
                 for clue in allClues:
 
                     # The Final Jeopardy Div is not located in the same place
@@ -154,6 +154,16 @@ def scrape_episode(url, season, episode, air_date):
                         clue_attribs['uid'] = uid
                         
                         # batch.put_item(Item=clue_attribs)
+
+            # Update the Processed Dictionary with the most recently processed episode
+            if season in processed:
+                processed[season].append(episode)
+            else:
+                processed[season] = [episode]
+
+            # Write out the pickle file
+            with open('./dynamodb_processed.p', 'wb') as file:
+                pickle.dump(processed, file)
 
     except RuntimeError:
         exception = 1

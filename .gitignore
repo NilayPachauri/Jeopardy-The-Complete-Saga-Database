@@ -128,5 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Firebase Private Key
+# Private Key
 firebase_key.json
+aws_key.csv

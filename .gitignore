@@ -131,3 +131,6 @@ dmypy.json
 # Private Key
 firebase_key.json
 aws_key.csv
+
+# pickle
+.p

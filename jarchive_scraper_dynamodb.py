@@ -66,10 +66,7 @@ def scrape_all_seasons(url):
 
     #Grab all of the seasons listed
     seasons = soup.find('div', {"id":"content"}).findAll('a')
-    count = 0
     for season in seasons:
-        if count > 20:
-            break
 
         season_name = unicodedata.normalize('NFKC', season.text)
 
@@ -81,8 +78,6 @@ def scrape_all_seasons(url):
 
         print('Finished scraping ' + season_name)
         print()
-
-        count += 1
 
 
 
@@ -137,26 +132,27 @@ def scrape_episode(url, season, episode, air_date):
                 categories['FJ'] = [(cats[12] if double_jeopardy_round_exists else cats[6]) if jeopardy_round_exists else cats[1]]
             
             allClues = soup.findAll(attrs={"class" : "clue"})
-            for clue in allClues:
+            with table.batch_writer() as batch:
+                for clue in allClues:
 
-                # The Final Jeopardy Div is not located in the same place
-                # as other questions so it must be found seperately
-                fj_div = None
-                if not clue.find('div') and clue.find(id='clue_FJ'):
-                    fj_div = clue.parent.parent.find('div')
+                    # The Final Jeopardy Div is not located in the same place
+                    # as other questions so it must be found seperately
+                    fj_div = None
+                    if not clue.find('div') and clue.find(id='clue_FJ'):
+                        fj_div = clue.parent.parent.find('div')
 
-                clue_attribs = get_clue_attribs(clue, categories, fj_div)
-                if clue_attribs:
-                    clue_attribs['air_date'] = air_date
-                    clue_attribs['season'] = season
-                    clue_attribs['episode'] = episode
-        
-                    #a shitty unique id but it should do
-                    uid = ': '.join([season, str(episode), clue_attribs['category'], str(clue_attribs['dollar_value'])])
+                    clue_attribs = get_clue_attribs(clue, categories, fj_div)
+                    if clue_attribs:
+                        clue_attribs['air_date'] = air_date
+                        clue_attribs['season'] = season
+                        clue_attribs['episode'] = episode
+            
+                        #a shitty unique id but it should do
+                        uid = ': '.join([season, str(episode), clue_attribs['category'], str(clue_attribs['dollar_value'])])
 
-                    clue_attribs['uid'] = uid
-                    
-                    table.put_item(Item=clue_attribs)
+                        clue_attribs['uid'] = uid
+                        
+                        batch.put_item(Item=clue_attribs)
 
     except RuntimeError:
         exception = 1

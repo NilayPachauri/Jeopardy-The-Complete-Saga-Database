@@ -118,8 +118,11 @@ def scrape_episode(url, season, episode, air_date):
                     uid = uid.replace('/', '\\')
 
                     doc_ref = db.collection(u'clues').document(uid)
-                    doc_ref.set(clue_attribs)
+                    batch.set(doc_ref, clue_attribs)
 
+            # Commit the batch
+            batch.commit()
+            
             # Update the Processed Dictionary with the most recently processed episode
             if season in processed:
                 processed[season].append(episode)

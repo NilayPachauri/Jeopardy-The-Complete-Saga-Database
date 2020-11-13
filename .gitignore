@@ -133,4 +133,4 @@ firebase_key.json
 aws_key.csv
 
 # pickle
-.p
+*.p

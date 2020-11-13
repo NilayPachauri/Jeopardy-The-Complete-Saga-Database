@@ -92,31 +92,32 @@ def scrape_episode(url, season, episode, air_date):
                 categories['FJ'] = [(cats[12] if double_jeopardy_round_exists else cats[6]) if jeopardy_round_exists else cats[1]]
             
             # Perform a Batch Write for all Clues in an Episode
-            with table.batch_writer() as batch:
-                allClues = soup.findAll(attrs={"class" : "clue"})
-                for clue in allClues:
+            batch = db.batch()
 
-                    # The Final Jeopardy Div is not located in the same place
-                    # as other questions so it must be found seperately
-                    fj_div = None
-                    if not clue.find('div') and clue.find(id='clue_FJ'):
-                        fj_div = clue.parent.parent.find('div')
+            allClues = soup.findAll(attrs={"class" : "clue"})
+            for clue in allClues:
 
-                    clue_attribs = get_clue_attribs(clue, categories, fj_div)
-                    if clue_attribs:
-                        clue_attribs['air_date'] = air_date
-                        clue_attribs['season'] = season
-                        clue_attribs['episode'] = episode
-            
-                        # Create Unique Identification
-                        uid = ': '.join([season, str(episode), clue_attribs['category'], str(clue_attribs['dollar_value'])])
+                # The Final Jeopardy Div is not located in the same place
+                # as other questions so it must be found seperately
+                fj_div = None
+                if not clue.find('div') and clue.find(id='clue_FJ'):
+                    fj_div = clue.parent.parent.find('div')
 
-                        # Replace potential forward slashes with backward slashes
-                        # Note: Firebase forward slash represeents a new collection
-                        uid = uid.replace('/', '\\')
+                clue_attribs = get_clue_attribs(clue, categories, fj_div)
+                if clue_attribs:
+                    clue_attribs['air_date'] = air_date
+                    clue_attribs['season'] = season
+                    clue_attribs['episode'] = episode
+        
+                    # Create Unique Identification
+                    uid = ': '.join([season, str(episode), clue_attribs['category'], str(clue_attribs['dollar_value'])])
 
-                        doc_ref = db.collection(u'clues').document(uid)
-                        doc_ref.set(clue_attribs)
+                    # Replace potential forward slashes with backward slashes
+                    # Note: Firebase forward slash represeents a new collection
+                    uid = uid.replace('/', '\\')
+
+                    doc_ref = db.collection(u'clues').document(uid)
+                    doc_ref.set(clue_attribs)
 
             # Update the Processed Dictionary with the most recently processed episode
             if season in processed:

@@ -15,12 +15,12 @@ seasons_url = 'http://www.j-archive.com/listseasons.php'
 base_url = 'http://www.j-archive.com/'
 
 # store into firebase
-cred = credentials.Certificate('./firebase_key.json')
+cred = credentials.Certificate('./firestore_key.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # Load the already processed episodes
-processed = pickle.load(open('./firebase_processed.p', 'rb'))
+processed = pickle.load(open('./firestore_processed.p', 'rb'))
 
 def scrape_all_seasons(url):
 

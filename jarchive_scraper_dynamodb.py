@@ -153,7 +153,7 @@ def scrape_episode(url, season, episode, air_date):
 
                         clue_attribs['uid'] = uid
                         
-                        # batch.put_item(Item=clue_attribs)
+                        batch.put_item(Item=clue_attribs)
 
             # Update the Processed Dictionary with the most recently processed episode
             if season in processed:

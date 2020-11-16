@@ -130,6 +130,7 @@ dmypy.json
 
 # Private Key
 firestore_key.json
+firestore_category_key.json
 aws_key.csv
 
 # pickle

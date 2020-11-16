@@ -119,10 +119,10 @@ def scrape_episode(url, season, episode, air_date):
 
                     doc_ref = db.collection(u'clues').document(uid)
                     batch.set(doc_ref, clue_attribs)
-
+                    
             # Commit the batch
             batch.commit()
-            
+
             # Update the Processed Dictionary with the most recently processed episode
             if season in processed:
                 processed[season].append(episode)
@@ -133,8 +133,8 @@ def scrape_episode(url, season, episode, air_date):
             with open(pickle_file, 'wb') as file:
                 pickle.dump(processed, file)
 
-    except RuntimeError:
-        exception = 1
+    except RuntimeError as re:
+        print(re)
 
 
 def get_clue_attribs(clue, cats, fj_div=None):

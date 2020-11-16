@@ -63,8 +63,8 @@ def scrape_season(url, season):
 
             print('\tScraping Episode {} from {}'.format(ep_num, episode['href']))
             scrape_episode(episode['href'], season, ep_num, air_date)
-        except ResourceExhausted:
-            print('\t ResourceExhausted: {}'.format(e))
+        except ResourceExhausted as re:
+            print('\t ResourceExhausted: {}'.format(re))
             exit()
         except Exception as e:
             print(type(e))

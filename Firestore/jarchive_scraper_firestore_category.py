@@ -53,6 +53,7 @@ def scrape_season(url, season):
     episodes = soup.find('div', {"id":"content"}).findAll('a',{"href":re.compile('showgame\.php')})
     for episode in episodes:
         try:
+        # if True:
             ep_data = unicodedata.normalize('NFKC', episode.text).split(',')
             ep_num = int(re.search('#(\d+)', ep_data[0]).group(1))
 
@@ -136,14 +137,14 @@ def scrape_episode(url, season, episode, air_date):
             clue_cat = clue_attribs['category']
             clue_order = str(clue_attribs['order'])
 
-            del clue_attribs[clue_jtype]
-            del clue_attribs[clue_cat]
-            del clue_attribs[clue_order]
+            del clue_attribs['type']
+            del clue_attribs['category']
+            del clue_attribs['order']
 
             categories_clues[clue_jtype][clue_cat]['clues'][clue_order] = clue_attribs
             
     # Number of Questions Per Category
-    CAT_QUESTIONS = 6
+    CAT_QUESTIONS = 5
 
     # Remove All Categories that weren't completed
     for jtype in categories_clues:
@@ -153,7 +154,7 @@ def scrape_episode(url, season, episode, air_date):
             continue
 
         # List of Categories to delete
-        delete = [cat for cat, questions in categories_clues[jtype].items() if len(questions) != CAT_QUESTIONS]
+        delete = [cat for cat, attributes in categories_clues[jtype].items() if len(attributes['clues']) != CAT_QUESTIONS]
 
         # Delete the categories
         for cat in delete:

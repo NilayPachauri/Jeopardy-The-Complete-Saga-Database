@@ -43,7 +43,6 @@ def scrape_all_seasons(url):
         scrape_season(base_url+season['href'], season_name)
         print('Finished scraping ' + season_name)
         print()
-        break
 
 def scrape_season(url, season):
     
@@ -72,7 +71,6 @@ def scrape_season(url, season):
             print(e)
             print('\tCould not correctly parse ' + unicodedata.normalize('NFKC', episode.text).strip())
         sys.stdout.flush()
-        break
 
 
 def scrape_episode(url, season, episode, air_date):

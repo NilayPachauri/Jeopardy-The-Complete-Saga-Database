@@ -27,10 +27,6 @@ try:
 except Exception as e:
     print(e)
 
-# Get the Counters for each category count
-# counters_ref = db.collection(u'count').document('counters')
-# counters_dict = counters_ref.get()
-
 def scrape_all_seasons(url):
 
     soup = BeautifulSoup(scraperwiki.scrape(url), features='lxml')
@@ -45,7 +41,6 @@ def scrape_all_seasons(url):
         scrape_season(base_url+season['href'], season_name)
         print('Finished scraping ' + season_name)
         print()
-        break
 
 def scrape_season(url, season):
     
@@ -66,9 +61,10 @@ def scrape_season(url, season):
             print('\tScraping Episode {} from {}'.format(ep_num, episode['href']))
             scrape_episode(episode['href'], season, ep_num, air_date)
         except Exception as e:
+            print(type(e))
+            print(e)
             print('\tCould not correctly parse ' + unicodedata.normalize('NFKC', episode.text).strip())
         sys.stdout.flush()
-        break
 
 
 def scrape_episode(url, season, episode, air_date):
@@ -92,18 +88,21 @@ def scrape_episode(url, season, episode, air_date):
                 cats.append(cat.text)
 
             # Populate the Category Dictionary
-            categories = {}
+            categories_by_jtype = {}
             if jeopardy_round_exists:
-                categories['J'] = cats[:6]
+                categories_by_jtype['J'] = cats[:6]
 
             if double_jeopardy_round_exists:
-                categories['DJ'] = cats[6:12] if jeopardy_round_exists else cats[:6]
+                categories_by_jtype['DJ'] = cats[6:12] if jeopardy_round_exists else cats[:6]
 
             if final_jeopardy_round_exists:
-                categories['FJ'] = [(cats[12] if double_jeopardy_round_exists else cats[6]) if jeopardy_round_exists else cats[1]]
-            
-            # Perform a Batch Write for all Clues in an Episode
-            # batch = db.batch()
+                categories_by_jtype['FJ'] = [(cats[12] if double_jeopardy_round_exists else cats[6]) if jeopardy_round_exists else cats[1]]
+
+            categories_clues = {}
+            for jtype, categories in categories_by_jtype.items():
+                categories_clues[jtype] = {}
+                for category in categories:
+                    categories_clues[jtype][category] = {'category': category}
 
             allClues = soup.findAll(attrs={"class" : "clue"})
             for clue in allClues:
@@ -114,24 +113,70 @@ def scrape_episode(url, season, episode, air_date):
                 if not clue.find('div') and clue.find(id='clue_FJ'):
                     fj_div = clue.parent.parent.find('div')
 
-                clue_attribs = get_clue_attribs(clue, categories, fj_div)
+                clue_attribs = get_clue_attribs(clue, categories_by_jtype, fj_div)
                 if clue_attribs:
                     clue_attribs['air_date'] = air_date
                     clue_attribs['season'] = season
                     clue_attribs['episode'] = episode
-        
-                    # Create Unique Identification
-                    uid = ': '.join([season, str(episode), clue_attribs['category'], str(clue_attribs['dollar_value'])])
 
-                    # Replace potential forward slashes with backward slashes
-                    # Note: Firebase forward slash represeents a new collection
-                    uid = uid.replace('/', '\\')
+                    clue_jtype = clue_attribs['type']
+                    clue_cat = clue_attribs['category']
+                    clue_order = str(clue_attribs['order'])
 
-                    # doc_ref = db.collection(u'clues').document(uid)
-                    # batch.set(doc_ref, clue_attribs)
+                    categories_clues[clue_jtype][clue_cat][clue_order] = clue_attribs
                     
-            # Commit the batch
-            # batch.commit()
+            # Number of Questions Per Category
+            CAT_QUESTIONS = 6
+
+            # Remove All Categories that weren't completed
+            for jtype in categories_clues:
+
+                # Final Jeopardy will always be asked
+                if jtype == 'FJ':
+                    continue
+
+                # List of Categories to delete
+                delete = [cat for cat, questions in categories_clues[jtype].items() if len(questions) != CAT_QUESTIONS]
+
+                # Delete the categories
+                for cat in delete:
+                    del categories_clues[jtype][cat]
+
+            # Perform a Batch Write for all Categories in Episode
+            batch = db.batch()
+
+            counters_ref = db.collection(u'count').document(u'counters')
+            counters_dict = counters_ref.get().to_dict()
+
+            # Dict to associate Jeopardy Type with Collection Name and counter variable
+            jtype_to_ref_details = {
+                'J': {
+                    'collection': u'jeopardy',
+                    'counter': 'jcount'
+                },
+                'DJ': {
+                    'collection': u'double_jeopardy',
+                    'counter': 'djcount'
+                },
+                'FJ': {
+                    'collection': u'final_jeopardy',
+                    'counter': 'fjcount'
+                }
+            }
+
+            for jtype in categories_clues:
+                for cat in categories_clues[jtype]:
+                    collection_name = jtype_to_ref_details[jtype]['collection']
+                    counter_name = jtype_to_ref_details[jtype]['counter']
+
+                    doc_ref = db.collection(collection_name).document(str(counters_dict[counter_name]))
+                    batch.set(doc_ref, categories_clues[jtype][cat])
+                    counters_dict[counter_name] += 1
+
+            batch.update(counters_ref, counters_dict)
+
+            # Commit Batch to the Firebase
+            batch.commit()
 
             # Update the Processed Dictionary with the most recently processed episode
             if season in processed:
@@ -144,6 +189,7 @@ def scrape_episode(url, season, episode, air_date):
                 pickle.dump(processed, file)
 
     except RuntimeError as re:
+        print('Error')
         print(re)
 
 
